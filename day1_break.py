@@ -3,7 +3,8 @@ import torch
 from transformers import GPT2LMHeadModel, GPT2Tokenizer
 from torch.utils.data import DataLoader
 import time
-torch.backends.cudnn.benchmark = True
+from torch.cuda.amp import autocast
+
 
 # Check GPU is visible
 print(f"CUDA available: {torch.cuda.is_available()}")
@@ -19,7 +20,7 @@ params = sum(p.numel() for p in model.parameters())
 print(f"Parameters: {params:,}")
 
 # Fake data (random tokens) - we don't care about quality, just speed
-batch_size = 64  # <-- WE WILL BREAK THIS
+batch_size = 32  # <-- WE WILL BREAK THIS
 seq_len = 512
 
 # Training loop
@@ -34,18 +35,28 @@ for step in range(10):
     
     # Forward pass
     start = time.time()
-    outputs = model(input_ids, labels=input_ids)
-    loss = outputs.loss
-    
+    with autocast():
+        outputs = model(input_ids, labels=input_ids)
+        loss = outputs.loss
+    torch.cuda.synchronize()
+    fTime = time.time()-start
+
     # Backward pass
+    bStart = time.time()
     loss.backward()
+    torch.cuda.synchronize()
+    bTime = time.time()-bStart
+
+    oStart = time.time()
     optimizer.step()
     optimizer.zero_grad()
+    torch.cuda.synchronize()
+    oTime = time.time()-oStart
     
     # Memory check
     mem_used = torch.cuda.memory_allocated() / 1e9
     mem_total = torch.cuda.get_device_properties(0).total_memory / 1e9
     
-    print(f"Step {step}: loss={loss.item():.3f}, mem={mem_used:.1f}/{mem_total:.1f}GB, time={time.time()-start:.2f}s")
+    print(f"Step {step}: loss={loss.item():.3f}, mem={mem_used:.1f}/{mem_total:.1f}GB, time={time.time()-start:.2f}s,  forward time={fTime:.2f}s, backward time={bTime:.2f}s, optimisation time={oTime:.2f}s")
 
 print("\n✓ Completed without crashing")
