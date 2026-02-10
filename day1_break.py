@@ -63,7 +63,8 @@ for step in range(10):
     # Memory check
     mem_used = torch.cuda.memory_allocated() / 1e9
     mem_total = torch.cuda.get_device_properties(0).total_memory / 1e9
-    
-    print(f"Step {step}: loss={loss.item():.3f}, mem={mem_used:.1f}/{mem_total:.1f}GB, time={time.time()-start:.2f}s,  forward time={fTime:.2f}s, backward time={bTime:.2f}s, optimisation time={oTime:.2f}s")
+    tokens_per_step = batch_size * seq_len * accumulation_steps
+    tokens_per_sec = tokens_per_step / (time.time()-start)
+    print(f"Step {step}: loss={loss.item():.3f},mem={mem_used:.1f}/{mem_total:.1f}GB, time={time.time()-start:.2f}s,  forward time={fTime:.2f}s, backward time={bTime:.2f}s, optimisation time={oTime:.2f}, tokens per sec={tokens_per_sec:.2f}")
 
 print("\n✓ Completed without crashing")
