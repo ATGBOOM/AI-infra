@@ -3,6 +3,7 @@ import torch
 from transformers import GPT2LMHeadModel, GPT2Tokenizer
 from torch.utils.data import DataLoader
 import time
+torch.backends.cudnn.benchmark = True
 
 # Check GPU is visible
 print(f"CUDA available: {torch.cuda.is_available()}")
@@ -18,7 +19,7 @@ params = sum(p.numel() for p in model.parameters())
 print(f"Parameters: {params:,}")
 
 # Fake data (random tokens) - we don't care about quality, just speed
-batch_size = 128  # <-- WE WILL BREAK THIS
+batch_size = 64  # <-- WE WILL BREAK THIS
 seq_len = 512
 
 # Training loop
