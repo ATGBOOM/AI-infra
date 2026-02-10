@@ -20,8 +20,10 @@ params = sum(p.numel() for p in model.parameters())
 print(f"Parameters: {params:,}")
 
 # Fake data (random tokens) - we don't care about quality, just speed
-batch_size = 32  # <-- WE WILL BREAK THIS
+batch_size = 64  # <-- WE WILL BREAK THIS
 seq_len = 512
+
+accumulation_steps = 1
 
 # Training loop
 optimizer = torch.optim.AdamW(model.parameters(), lr=1e-4)
@@ -30,22 +32,27 @@ model.train()
 print(f"\n--- Training with batch_size={batch_size}, seq_len={seq_len} ---")
 
 for step in range(10):
-    # Random input
-    input_ids = torch.randint(0, 50257, (batch_size, seq_len)).cuda()
-    
+
     # Forward pass
     start = time.time()
-    with autocast():
-        outputs = model(input_ids, labels=input_ids)
-        loss = outputs.loss
-    torch.cuda.synchronize()
-    fTime = time.time()-start
+    fTime = 0
+    bTime = 0
+    for i in range(accumulation_steps):
+        input_ids = torch.randint(0, 50257, (batch_size, seq_len)).cuda()
+        fStart = time.time()
+       
+        with autocast():
+            outputs = model(input_ids, labels=input_ids)
+            loss = outputs.loss
+        torch.cuda.synchronize()
+        fTime +=time.time()-fStart
 
-    # Backward pass
-    bStart = time.time()
-    loss.backward()
-    torch.cuda.synchronize()
-    bTime = time.time()-bStart
+        # Backward pass
+        loss = loss / accumulation_steps
+        bStart = time.time()
+        loss.backward()
+        torch.cuda.synchronize()
+        bTime +=time.time()-bStart
 
     oStart = time.time()
     optimizer.step()
